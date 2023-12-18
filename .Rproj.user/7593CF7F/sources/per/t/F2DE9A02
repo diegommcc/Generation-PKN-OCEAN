@@ -1,0 +1,26 @@
+{
+    "id": "F2DE9A02",
+    "path": "~/data/DM23/DM-29_Mouse-GSMMs_curation/Generation-PKN-COSMOS/src/final_functions_PKN_COSMOS.R",
+    "project_path": null,
+    "type": "r_source",
+    "hash": "1743053985",
+    "contents": "",
+    "dirty": false,
+    "created": 1701435955626.0,
+    "source_on_save": false,
+    "relative_order": 6,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "97,76",
+        "scrollLine": "80"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1701436077,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1701436077473,
+    "read_only": false,
+    "read_only_alternatives": []
+}
