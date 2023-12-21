@@ -186,9 +186,7 @@ create_PKN_OCEAN <- function(
   reaction.ids <- unlist(
     mat.object[[which(attribs.mat == list.params.GSMM$reaction.ID.name)]]
   )
-  ## reaction to genes df: 
-  ##TODO: if length == 0, then no gene name, that's why sometimes there are genes with a number
-  ## ask about this
+  ## reaction to genes df
   reaction.to.genes.df <- lapply(
     seq_along(reaction.list),
     \(idx) {
@@ -221,6 +219,10 @@ create_PKN_OCEAN <- function(
   orphan.reacts <- grepl(pattern = "^\\d+$", reaction.to.genes.df$Gene)
   reaction.to.genes.df[orphan.reacts, "Reaction.ID"] <- paste0(
     "orphanReac.", reaction.to.genes.df[orphan.reacts, "Reaction.ID"]
+  )
+  reaction.to.genes.df[orphan.reacts, "Gene"] <- paste0(
+    reaction.to.genes.df[orphan.reacts, "Gene"], ".",
+    reaction.to.genes.df[orphan.reacts, "Reaction.ID"]
   )
   reaction.to.genes.df <- unique(reaction.to.genes.df)
   ##############################################################################
@@ -404,9 +406,6 @@ create_PKN_OCEAN <- function(
 )
 
 ## this function removes cofactors based on BRITE information. 
-# I have to improve it: check inputs, etc. 
-# maybe creating a class for this could be a good idea... 
-# transaminases are removed here. Ask Aurelien
 .remove_cofactors <- function(
     list.network, 
     KEGG.compounds = NULL,
@@ -760,7 +759,7 @@ create_PKN_OCEAN <- function(
 .genes_to_symbol <- function(
     list.network, 
     organism, 
-    ont.from = "ensembl_gene_id", ## check if correect?? funciton is not for users...
+    ont.from = "ensembl_gene_id", 
     ont.to = "external_gene_name"
 ) {
   dataset.biomart <- switch(

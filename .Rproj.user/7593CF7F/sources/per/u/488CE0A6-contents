@@ -1,6 +1,0 @@
-kegg.path <- "/home/dmananesc/data/DM23/DM-29_Mouse-GSMMs_curation/KEGGREST.Compounds"
-
-vec.cofactors <-readRDS(file.path(kegg.path, "231201_KEGG.Compound.cofactors.IDs.rds"))
-vec.cofactors <- unname(vec.cofactors)
-
-paste(paste0("'", vec.cofactors, "'"), collapse = ", ")

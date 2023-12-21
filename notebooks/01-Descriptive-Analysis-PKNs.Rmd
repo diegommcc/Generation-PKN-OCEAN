@@ -1,0 +1,165 @@
+---
+title: "01 - Basic analysis of generated PKNs for OCEAN"
+date: "2023-12-20"
+output:
+  html_document:
+    theme: "cerulean"
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+suppressMessages(library("biomaRt"))
+suppressMessages(library("readr"))
+suppressMessages(library("stringr"))
+suppressMessages(library("metaboliteIDmapping"))
+suppressMessages(library("R.matlab"))
+suppressMessages(library("dplyr"))
+suppressMessages(library("ggplot2"))
+
+projectPath <- here::here()
+outputPath <- file.path(projectPath, "output")
+reportsPath <- file.path(projectPath, "reports/01-Descriptive-Analysis-PKNs")
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  fig.align = "center",
+  fig.path = paste0(reportsPath, "/plots/"),
+  fig.pos = "H",
+  message = TRUE,
+  warning = FALSE,
+  comment = NA,
+  dev = c("png")
+)
+```
+
+# PKN for mouse
+
+```{r}
+mm.PKN.data <- readRDS(file.path(outputPath, "OCEAN.PKN.mm.10090.rds"))
+```
+
+```{r}
+mm.PKN <- mm.PKN.data[[1]]
+dim(mm.PKN)
+```
+
+## Degree of genes and metabolites: checking if it is a free-scale network
+
+```{r}
+nodes <- c(mm.PKN$source, mm.PKN$target)
+dfPlotHist <- table(nodes) %>% tibble::enframe() %>% mutate(
+  Degree.Log = log10(as.numeric(value)),
+  Freq = table(table(nodes))[as.character(value)],
+  Freq.Log = log10(Freq)
+)
+dfPlotHist %>% ggplot(aes(x = Degree.Log, y = Freq.Log)) +           
+  geom_point() + ggtitle("Degree vs freq degree for all nodes") + 
+  theme_classic() + theme(plot.title = element_text(face = "bold"))
+dfPlotHist %>% ggplot(aes(x = value)) + 
+  geom_histogram(alpha = 0.8, color = "black") + theme_classic() + 
+  ggtitle("Distribution of degree for all nodes") + 
+  xlab("Degree") + theme(plot.title = element_text(face = "bold"))
+dfPlotHist %>% filter(value > 1, value < max(value)) %>% ggplot(aes(x = value)) + 
+  geom_histogram(alpha = 0.8, color = "black") + theme_classic() + 
+  ggtitle("Distribution of degree for all nodes (only degree > 1 and removing transporters)") + 
+  xlab("Degree") + theme(plot.title = element_text(face = "bold"))
+```
+
+
+```{r}
+nodes <- c(mm.PKN$source, mm.PKN$target)
+metabs <- nodes[grepl("Metab__", nodes)]
+dfPlotHist <- table(metabs) %>% tibble::enframe() %>% mutate(
+  Degree.Log = log10(as.numeric(value)),
+  Freq = table(table(metabs))[as.character(value)],
+  Freq.Log = log10(Freq)
+)
+dfPlotHist %>% ggplot(aes(x = Degree.Log, y = Freq.Log)) +           
+  geom_point() + ggtitle("Degree vs freq degree for metabolites") + 
+  theme_classic() + theme(plot.title = element_text(face = "bold"))
+dfPlotHist %>% ggplot(aes(x = value)) + 
+  geom_histogram(alpha = 0.8, color = "black") + theme_classic() + 
+  ggtitle("Distribution of degree for metabolites") + 
+  xlab("Degree") + theme(plot.title = element_text(face = "bold"))
+dfPlotHist %>% filter(value > 1) %>% ggplot(aes(x = value)) + 
+  geom_histogram(alpha = 0.8, color = "black") + theme_classic() + 
+  ggtitle("Distribution of degree for metabolites (only degree > 1)") + 
+  xlab("Degree") + theme(plot.title = element_text(face = "bold"))
+```
+
+
+
+```{r}
+nodes <- c(mm.PKN$source, mm.PKN$target)
+genes <- nodes[grepl("^Gene", nodes)]
+dfPlotHist <- table(genes) %>% tibble::enframe() %>% mutate(
+  Degree.Log = log10(as.numeric(value)),
+  Freq = table(table(genes))[as.character(value)],
+  Freq.Log = log10(Freq)
+)
+dfPlotHist %>% ggplot(aes(x = Degree.Log, y = Freq.Log)) +           
+  geom_point() + ggtitle("Degree vs freq degree for genes") + 
+  theme_classic() + theme(plot.title = element_text(face = "bold"))
+dfPlotHist %>% ggplot(aes(x = value)) + 
+  geom_histogram(alpha = 0.8, color = "black") + theme_classic() + 
+  ggtitle("Distribution of degree for genes") + 
+  xlab("Degree") + theme(plot.title = element_text(face = "bold"))
+dfPlotHist %>% filter(value > 1) %>% ggplot(aes(x = value)) + 
+  geom_histogram(alpha = 0.8, color = "black") + theme_classic() + 
+  ggtitle("Distribution of degree for genes (only degree > 1)") + 
+  xlab("Degree") + theme(plot.title = element_text(face = "bold"))
+```
+
+## Number of transporters, metabolites and genes
+
+```{r}
+length(c(mm.PKN$source, mm.PKN$target))
+sum(grepl("transporter", c(mm.PKN$source, mm.PKN$target)))
+```
+
+## Number of metabolites identified with HMDB, KEGG IDs 
+
+```{r}
+data.frame(
+  Unique.Mets = length(unique(metabs)),
+  Unique.HMDB = sum(grepl("HMDB", unique(metabs))),
+  Unique.KEGG = gsub(pattern = "Metab__", replacement = "", x = unique(metabs)) %>% 
+    grepl("^C", .) %>% sum()
+) %>% reshape2::melt() %>% ggplot(aes(x = variable, y = value)) + 
+  geom_bar(stat = "identity", color = "black", width = 0.6) + theme_classic() + 
+  ggtitle("Number of metabolites in PKN") + 
+    theme(
+      axis.title.y = element_blank(),
+      axis.title.x = element_blank(),
+      plot.title = element_text(face = "bold")
+    ) + 
+    scale_y_continuous(
+      limits = function(x){c(0, max(x) * 1.05)}, expand = c(0, 0)
+    ) 
+```
+
+```{r}
+data.frame(
+  Transporters = sum(grepl("transporter", c(mm.PKN$source, mm.PKN$target))),
+  Unique.orphan.Reactions = sum(grepl("orphan", unique(c(mm.PKN$source, mm.PKN$target)))),
+  Unique.reverse.reactions = sum(grepl("_reverse", unique(c(mm.PKN$source, mm.PKN$target))))
+) %>% reshape2::melt() %>% ggplot(aes(x = variable, y = value)) + 
+  geom_bar(stat = "identity", color = "black", width = 0.6) + theme_classic() + 
+  ggtitle("Reactions") + 
+    theme(
+      axis.title.y = element_blank(),
+      axis.title.x = element_blank(),
+      plot.title = element_text(face = "bold")
+    ) + 
+    scale_y_continuous(
+      limits = function(x){c(0, max(x) * 1.05)}, expand = c(0, 0)
+    ) 
+```
+
+
+
+
+

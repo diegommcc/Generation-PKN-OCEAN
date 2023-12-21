@@ -1,0 +1,7 @@
+Generation-PKN-OCEAN.Rproj
+*.Rproject
+*.Rproj.user
+*.Rhistory
+.RData
+.Ruserdata
+.Rproj

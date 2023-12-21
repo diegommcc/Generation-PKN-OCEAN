@@ -20,13 +20,6 @@ projectPath <- here::here()
 ## source
 source(file.path(projectPath, "src/final_functions_PKN_OCEAN.R"))
 
-## KEGG compounds: not neeeded
-# kegg.all.compunds <- readRDS(
-#   file.path(projectPath, "data", "231020_KEGG_All_Compunds", "ALL_COMPUNDS_KEGG.rds")
-# )
-# KEGG.compounds <- unlist(kegg.all.compunds, recursive = FALSE)
-# names(KEGG.compounds) <- sapply(KEGG.compounds, \(x) x$ENTRY)
-
 ## Homo sapiens
 reactions.map.hs <- read.delim(file.path(projectPath, "data/Human-PKN/reactions.tsv")) 
 metabolites.map.hs <- read.delim(file.path(projectPath, "data/Human-PKN/metabolites.tsv"))
