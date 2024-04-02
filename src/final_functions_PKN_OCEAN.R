@@ -2,7 +2,7 @@
 ## Description: set of functions to generate OCEAN PKN for different organisms 
 ## using GSMM information from <https://www.pnas.org/doi/10.1073/pnas.2102344118>
 ## Author: Diego Mañanes
-## Date: 23/11/27
+## Date: 24/04/02
 ################################################################################
 
 ## set of dependencies
@@ -38,6 +38,7 @@ create_PKN_OCEAN <- function(
   ),
   GSMM.degree.mets.threshold = 400,
   translate.genes = FALSE,
+  biomart.use.omnipath = TRUE,
   organism = NULL,
   genes.from = "ensembl_gene_id",
   genes.to = "external_gene_name",
@@ -50,6 +51,33 @@ create_PKN_OCEAN <- function(
   }  else if (is.null(KEGG.compounds) & verbose) {
     message(">>> Using internal list of cofactors determined using KEGG")
   }
+  dataset.biomart <- switch(
+    as.character(organism), 
+    "9606" = "hsapiens_gene_ensembl",
+    "10090" = "mmusculus_gene_ensembl",
+    "10116" = "rnorvegicus_gene_ensembl",
+    "7955" = "drerio_gene_ensembl",
+    "7227" = "dmelanogaster_gene_ensembl",
+    "6239" = "celegants_gene_ensembl"
+  )
+  if (is.null(dataset.biomart)) 
+    stop("Chosen organism is not recognizable")
+  
+  if (biomart.use.omnipath == TRUE) {
+    if (verbose) message(">>> Using the OmnipathR to retrieve biomart information\n")
+    ## get info from BiomartR using OmnipathR
+    mapping.biomart <- OmnipathR::biomart_query(
+      attrs = c(
+        "ensembl_peptide_id",'ensembl_gene_id', 'external_gene_name'
+      ),
+      dataset = dataset.biomart
+    ) %>% as.data.frame()
+  } else {
+    if (verbose) message("\n>>> Using the BiomaRt R package when needed")
+    
+    mapping.biomart <- NULL
+  }
+  
   ## Getting GSSM PKN
   if (verbose) message("\n>>> Getting GSMM PKN...\n")
   gsmm.PKN.list <- .create_GSMM_basal_PKN(
@@ -72,7 +100,8 @@ create_PKN_OCEAN <- function(
     }
     gsmm.PKN.list <- .genes_to_symbol(
       gsmm.PKN.list, organism = organism, 
-      ont.from = genes.from, ont.to = genes.to
+      ont.from = genes.from, ont.to = genes.to, 
+      mapping.biomart = mapping.biomart
     )
   }
   gsmm.PKN.list <- .remove_cofactors(
@@ -759,6 +788,7 @@ create_PKN_OCEAN <- function(
 .genes_to_symbol <- function(
     list.network, 
     organism, 
+    mapping.biomart = NULL,
     ont.from = "ensembl_gene_id", 
     ont.to = "external_gene_name"
 ) {
@@ -775,83 +805,61 @@ create_PKN_OCEAN <- function(
     stop("Chosen organism is not recognizable")
   
   regex <- "(Gene\\d+__)|(_reverse)"
+  regex.reverse <- "_reverse"
   ## getting biomart info
   genes.GSMM <- grep("Gene\\d+__", unlist(list.network[[1]]), value = TRUE) %>% 
     gsub(regex, "", .) %>% 
     ifelse(grepl("_", .), sapply(strsplit(., split = "_"), \(x) x), .) %>% 
     unlist()
-  ensembl.link <- useEnsembl(biomart = "ensembl", dataset = dataset.biomart)
-  ensembl.df <- getBM(
-    filters = ont.from, 
-    attributes = c('ensembl_gene_id', 'external_gene_name'),
-    values = genes.GSMM,
-    mart = ensembl.link
-  ) %>% unique()
-  rownames(ensembl.df) <- ensembl.df$ensembl_gene_id
-  ## translating genes when possible (not found genes are not removed)
-  ## when complexes are present (several genes concatenated), this code does not work
-  list.network[[1]] <- list.network[[1]] %>% mutate(
-    source = case_when(
-      ## cases with a single gene
-      grepl("Gene\\d+__", source) ~ case_when(
-        !is.na(
-          ensembl.df[gsub(regex, replacement = "", x = source), ont.to]
-        ) ~ paste0(
-          "Gene", 
-          gsub("\\D", "", sapply(strsplit(x = source, split = "__"), \(x) x[1])), 
-          "__", 
-          ensembl.df[gsub(regex, replacement = "", x = source), ont.to]
-        ), 
-        ## cases with complexes: more than 1 gene
-        grepl("[0-9]_[E]", source) ~ 
-          paste0(
-            "Gene", 
-            gsub("\\D", "", sapply(strsplit(x = target, split = "__"), \(x) x[1])), 
-            "__",
-            unlist(
-              strsplit(
-                gsub(
-                  pattern = "reverse", replacement = "", 
-                  grep("[0-9]_[E]", source, value = T)[1]
-                ), 
-                split = "_"
-              )
-            )[-c(1:2)] %>% ensembl.df[., ont.to] %>% paste(collapse = "_")
-          ),
-        TRUE ~ source
-      ), TRUE ~ source
-    ),
-    target = case_when(
-      ## cases with a single gene
-      grepl("Gene\\d+__", target) ~ case_when(
-        !is.na(
-          ensembl.df[gsub(regex, replacement = "", x = target), ont.to]
-        ) ~ paste0(
-          "Gene", 
-          gsub("\\D", "", sapply(strsplit(x = target, split = "__"), \(x) x[1])), 
-          "__", 
-          ensembl.df[gsub(regex, replacement = "", x = target), ont.to]
-        ), 
-        ## cases with complexes: more than 1 gene
-        grepl("[0-9]_[E]", target) ~ 
-          paste0(
-            "Gene", 
-            gsub("\\D", "", sapply(strsplit(x = target, split = "__"), \(x) x[1])), 
-            "__",
-            unlist(
-              strsplit(
-                gsub(
-                  pattern = "reverse", replacement = "", 
-                  grep("[0-9]_[E]", target, value = T)[1]
-                ), 
-                split = "_"
-              )
-            )[-c(1:2)] %>% ensembl.df[., ont.to] %>% paste(collapse = "_")
-          ),
-        TRUE ~ target
-      ), TRUE ~ target
+  if (is.null(mapping.biomart)) {
+    ensembl.link <- useEnsembl(biomart = "ensembl", dataset = dataset.biomart)
+    ensembl.df <- getBM(
+      filters = ont.from, 
+      attributes = c('ensembl_gene_id', 'external_gene_name'),
+      values = genes.GSMM,
+      mart = ensembl.link
+    ) %>% unique()
+    rownames(ensembl.df) <- ensembl.df$ensembl_gene_id  
+  } else {
+    ensembl.df <- mapping.biomart %>% select(-ensembl_peptide_id) %>% 
+      unique() %>% filter(
+        !is.na(.data[[ont.from]]), !is.na(.data[[ont.to]]),
+      ) 
+    rownames(ensembl.df) <- ensembl.df[[ont.from]]
+  }
+  ## translating genes when possible (genes not found are not removed but kept 
+  # with ENSEMBL IDs)
+  genes.logical <- data.frame(
+    source = grepl("Gene\\d+__", list.network[[1]]$source),
+    target = grepl("Gene\\d+__", list.network[[1]]$target)
+  ) %>% as.matrix()
+  ## modifying the matrix in place seems to be faster than dplyr code / check 
+  # checking_functions_COSMOS.R file in case I need to come back
+  list.network[[1]] <- as.matrix(list.network[[1]])
+  for (i in seq(nrow(list.network[[1]]))) {
+    gene <- list.network[[1]][i, ][genes.logical[i, ]]
+    new.character <- paste0(
+      "Gene", 
+      gsub("\\D", "", sapply(strsplit(x = gene, split = "__"), \(x) x[1])), 
+      "__", 
+      gsub(regex, "", gene) %>% 
+        strsplit(x = ., split = "_") %>% 
+        sapply(
+          \(iter) {
+            ifelse(
+              test = is.na(ensembl.df[iter, ont.to]), 
+              yes = iter, 
+              no = ensembl.df[iter, ont.to]
+            ) %>% paste(collapse = "_")
+          }
+        ),
+      ifelse(grepl(regex.reverse, gene), yes = "_reverse", no = "")
     )
-  ) 
+    list.network[[1]][i, ][genes.logical[i, ]] <- new.character
+  }
+  
+  list.network[[1]] <- as.data.frame(list.network[[1]])
+  
   list.network[[3]] <- list.network[[3]] %>% mutate(
     Gene = case_when(
       !is.na(
