@@ -90,6 +90,7 @@ create_PKN_OCEAN <- function(
     degree.mets.cutoff = GSMM.degree.mets.threshold,
     verbose = verbose
   )
+  
   ## for one of the organisms, tihs part will be needed, but not implemented here
   if (translate.genes){
     if (!organism %in% c(9606, 10090, 10116, 7955, 7227, 6239)) {
